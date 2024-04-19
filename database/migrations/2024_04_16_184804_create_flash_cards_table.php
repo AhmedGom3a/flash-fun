@@ -15,7 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('question', 255);
             $table->text('answer')->fulltext();
-            $table->string('user_id', 6);
             $table->timestamps();
         });
     }

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('practices', function (Blueprint $table) {
             $table->id();
+            $table->string('user_id', 6);
             $table->foreignId('flash_card_id')->constrained()->onDelete('cascade');
             $table->boolean('correct')->default(false);
             $table->timestamps();

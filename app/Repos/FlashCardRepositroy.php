@@ -7,15 +7,10 @@ use Illuminate\Database\Eloquent\Collection;
 
 class FlashCardRepositroy
 {
-    public function getCardsByUserId(string $userId): Collection
-    {
-        return FlashCard::where('user_id', $userId)->select('question', 'answer')->get();
-    }
-
     public function getNonPracticedCardsByUserId(string $userId): Collection
     {
-        return FlashCard::where('user_id', $userId)
-        ->whereDoesntHave('practices')
-        ->select('flash_cards.id','question', 'answer')->get();
+        return FlashCard::whereDoesntHave('practices', function($query) use($userId) {
+            return $query->where('user_id', $userId);
+        })->select('id','question', 'answer')->get();
     }
 }

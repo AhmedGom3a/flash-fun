@@ -8,7 +8,7 @@ use App\Repos\FlashCardRepositroy;
 use App\Repos\PracticeRepository;
 use Illuminate\Support\Str;
 use Illuminate\Console\Command;
-use Symfony\Component\HttpFoundation\Session\Flash\FlashBag;
+use Illuminate\Database\Eloquent\Collection;
 
 class ManageFlashCard extends Command
 {
@@ -30,11 +30,20 @@ class ManageFlashCard extends Command
         'Create a flashcard' => 'createFlashCard',
         'List all flashcards' => 'listAllCards',
         'Practice' => 'practice',
+        'Stats' => 'stats',
+        'Reset' => 'resetPractices',
         'Quit' => 'quit'
     ];
 
     private string $userId;
     private bool $quit = false;
+    private int $correctAnswers = 0;
+    private int $practiced = 0;
+
+    private $flashCards = [];
+    private $allowedQuestionsAnswers = [];
+
+    private const USER_ID_LENGTH = 6;
 
     public function __construct(
         private FlashCardRepositroy $flashCardRepositroy,
@@ -59,9 +68,8 @@ class ManageFlashCard extends Command
 
     private function createRandomUserId(): void
     {
-        $this->userId = Str::random(6);
+        $this->userId = Str::random(self::USER_ID_LENGTH);
     }
-
 
     private function createFlashCard(): void
     {
@@ -81,65 +89,47 @@ class ManageFlashCard extends Command
 
     private function listAllCards(): void
     {
-        $cards = $this->flashCardRepositroy->getCardsByUserId($this->userId)->makeHidden(['status']);
+        $cards = FlashCard::select('question', 'answer')->get()->makeHidden(['status']);
         $this->table(['Question', 'Answer'], $cards);
 
         $this->info('---------------------');
         $this->info('Total Available Cards: '. count($cards));
-        $this->info('---------------------');
     }
 
     private function practice(): void
     {
-        $nonPracticedCards = $this->flashCardRepositroy->getNonPracticedCardsByUserId($this->userId)->toArray();
-        $correctAnswers = $this->practiceRepository->getCorrectPracticedCardsCountByUserId($this->userId)->toArray();
-        $PracticedCards = $this->practiceRepository->getPracticedCardsByUserId($this->userId)->toArray();
-
-        $totalCards = count($nonPracticedCards) + count($PracticedCards);
-        $percentage = $totalCards > 0 ? (int) ((count($correctAnswers) / $totalCards) * 100) : 0;
-
-        $allCards = array_merge($nonPracticedCards, $PracticedCards);
-        $cardIds = array_column($allCards, 'id');
-        $practiceAllowedIds = array_diff($cardIds, array_column($correctAnswers, 'id'));
-        array_multisort($cardIds, SORT_ASC, $allCards);
-
-        $this->table(['Id','Question', 'Answer', 'Status'], $allCards);
-
-        $this->info('---------------------');
-        $this->info(sprintf(
-            'Correct Answered questions are %d out of %d (%d%%)',
-            $correctAnswers,
-            $totalCards,
-            $percentage
-        ));
-        $this->info('---------------------');
-
-        if (count($practiceAllowedIds) === 0) {
+        $this->loadFlashCards();
+        $this->displayPracticeStats();
+        if (count($this->allowedQuestionsAnswers) === 0) {
+            $this->info('No more questions to practice!');
             return;
         }
 
-        $questionId = $this->chooseQuestion(
-            'Choose enter question Id to practice or (0) to go back',
-            $practiceAllowedIds
-        );
+        $this->startPractice();
+    }
 
-        if($questionId == 0) {
-            return;
+    private function stats(): void
+    {
+        $this->loadFlashCards();
+        $allCardsCount = count($this->flashCards);
+        $this->info('Total available of questions: '. $allCardsCount);
+        $this->info($this->getPercentage($this->practiced, $allCardsCount).' % of questions that have an answer.');
+
+        $this->info($this->getCorrectPercentage().' % of questions that have a correct answer.');
+    }
+
+    private function resetPractices(): void
+    {
+        if (false === $this->quit) {
+            $this->info('Progress reset successfully!');
         }
-
-        $answer = $this->askUntilValid('Please enter the answer for this question');
-
-        Practice::updateOrCreate(
-            ['flash_card_id' => $questionId],
-            ['correct' => $this->checkValidAnswer((int) $questionId, $answer)]
-        );
+        Practice::where('user_id', $this->userId)->delete();
     }
 
     private function quit(): void
     {
-        // clear questions
-        // clear practices
         $this->quit = true;
+        $this->resetPractices();
     }
     
     private function showMainMenu(): string
@@ -156,24 +146,106 @@ class ManageFlashCard extends Command
         return $value;
     }
 
-    private function chooseQuestion(string $question, array $practiceAllowedIds)
+    private function startPractice(): void
     {
-        do {
-            $value = $this->ask($question);
-        } while (
-            $value !== '0'
-            && (
-                empty($value)
-                || false === is_numeric($value)
-                || false === in_array($value, $practiceAllowedIds)
-            )
-        );
+        while (true) {
+            $chosenQuestionId = $this->ask('Enter question number to practice or (0) to go back');
 
-        return $value;
+            if ($chosenQuestionId == 0) {
+                return;
+            }
+
+            if (false === $this->isValidQuestionId($chosenQuestionId)) {
+                continue;
+            }
+
+            if (false === in_array($chosenQuestionId, array_keys($this->allowedQuestionsAnswers))) {
+                $this->info('Already answered this question!');
+                continue;
+            }
+            
+            $answer = $this->askUntilValid($this->flashCards[$chosenQuestionId]['question']);
+
+            $correct = $this->checkValidAnswer((int) $chosenQuestionId, $answer);
+
+            $practice = Practice::updateOrCreate(
+                [
+                    'flash_card_id' => $chosenQuestionId,
+                    'user_id' => $this->userId
+                ],
+                [
+                    'correct' => $correct,
+                    'user_id' => $this->userId
+                ]
+            );
+
+            $this->info("Your Answer is {$practice->status}!");
+
+            $this->loadFlashCards();
+            $this->displayPracticeStats();
+        };
+    }
+
+    private function isValidQuestionId(string $value) {
+        return false === empty($value)
+        && true === is_numeric($value);
     }
 
     private function checkValidAnswer(int $questionId, string $answer): bool
     {
-        return strtolower(FlashCard::find($questionId)->answer) == strtolower($answer);
+        return isset($this->allowedQuestionsAnswers[$questionId])
+        && strtolower($this->allowedQuestionsAnswers[$questionId]) == strtolower($answer);
+    }
+
+    private function displayPracticeStats(): void 
+    {
+        $this->table(['Number','Question', 'Status'], $this->flashCards);
+
+        $this->info('---------------------');
+        $this->info(sprintf(
+            'Correct Answered questions are %d out of %d (%d%%)',
+            $this->correctAnswers,
+            count($this->flashCards),
+            $this->getCorrectPercentage()
+        ));
+    }
+   
+    private function loadFlashCards(): void
+    {
+        $this->allowedQuestionsAnswers = [];
+        $this->flashCards = [];
+        $nonPracticed = $this->flashCardRepositroy->getNonPracticedCardsByUserId($this->userId);
+        $this->prepareCardsCollection($nonPracticed);
+        $this->prepareCardsCollection($this->practiceRepository->getUserPractices($this->userId));
+        
+        $this->practiced = count($this->flashCards) - count($nonPracticed);
+        $this->correctAnswers = count($this->flashCards) - count($this->allowedQuestionsAnswers);
+    }
+
+    private function prepareCardsCollection(Collection $cards): void
+    { 
+        foreach ($cards as $card) {
+            $flashCardId = $card->flash_card_id ?? $card->id;
+            $this->flashCards[$flashCardId] = [
+                'number' => $flashCardId,
+                'question' => $card->question,
+                'status' => $card->status ?? 'Not Answered'
+            ];
+
+            if($card->status === null || $card->status === 'Incorrect') {
+                $this->allowedQuestionsAnswers[$flashCardId] = $card->answer;
+            }
+        }
+    }
+
+    private function getCorrectPercentage(): int
+    {
+        return count($this->flashCards) > 0 ? (int) (($this->correctAnswers / count($this->flashCards)) * 100) : 0;
+        return $this->getPercentage($this->correctAnswers, count($this->flashCards));
+    }
+
+    private function getPercentage(int $value, int $total): int
+    {
+        return $total > 0 ? (int) (($value / $total) * 100) : 0;
     }
 }
