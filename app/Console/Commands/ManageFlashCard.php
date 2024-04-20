@@ -2,67 +2,50 @@
 
 namespace App\Console\Commands;
 
-use App\Models\FlashCard;
 use App\Models\Practice;
-use App\Repos\FlashCardRepositroy;
-use App\Repos\PracticeRepository;
 use Illuminate\Support\Str;
 use Illuminate\Console\Command;
+use App\Repos\PracticeRepository;
+use App\Repos\FlashCardRepositroy;
 use Illuminate\Database\Eloquent\Collection;
+use App\Console\Commands\FlashCardActions\FlashCardActionInterface;
 
 class ManageFlashCard extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
+
     protected $signature = 'flashcard:interactive';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Command description';
-    
-    private array $actions = [
-        'Create a flashcard' => 'createFlashCard',
-        'List all flashcards' => 'listAllCards',
-        'Practice' => 'practice',
-        'Stats' => 'stats',
-        'Reset' => 'resetPractices',
-        'Quit' => 'quit'
-    ];
-
-    private string $userId;
-    private bool $quit = false;
-    private int $correctAnswers = 0;
-    private int $practiced = 0;
-
-    private $flashCards = [];
-    private $allowedQuestionsAnswers = [];
 
     private const USER_ID_LENGTH = 6;
 
+    private string $userId;
+    private bool $quit = false;
+
+    private int $correctAnswers = 0;
+    private int $practiced = 0;
+
+    private array $menu = [];
+    private array $flashCards = [];
+    private array $allowedQuestionsAnswers = [];
+
+
     public function __construct(
+        private array $actions,
         private FlashCardRepositroy $flashCardRepositroy,
         private PracticeRepository $practiceRepository,
     ) {
         parent::__construct();
     }
 
-    /**
-     * Execute the console command.
-     */
     public function handle()
     {
         $this->createRandomUserId();
+        $this->prepareActions();
 
         while ($this->quit === false) {
             $choice = $this->showMainMenu();
 
-            call_user_func([self::class, $this->actions[$choice]]);
+            call_user_func([$this->actions[$choice], 'handleAction']);
         }
     }
 
@@ -71,35 +54,16 @@ class ManageFlashCard extends Command
         $this->userId = Str::random(self::USER_ID_LENGTH);
     }
 
-    private function createFlashCard(): void
+    private function showMainMenu(): string
     {
-        $this->info('Let\'s create a new card!');
-
-        $question = $this->askUntilValid('Please enter the question for this card');
-        $answer = $this->askUntilValid('Please enter the answer for this question');
-
-        FlashCard::create([
-            'user_id' => $this->userId,
-            'question' => $question,
-            'answer' => $answer,
-        ]);
-
-        $this->info('Card created successfully!');
-    }
-
-    private function listAllCards(): void
-    {
-        $cards = FlashCard::select('question', 'answer')->get()->makeHidden(['status']);
-        $this->table(['Question', 'Answer'], $cards);
-
-        $this->info('---------------------');
-        $this->info('Total Available Cards: '. count($cards));
+        return $this->choice('What would you like to do?', $this->menu);
     }
 
     private function practice(): void
     {
         $this->loadFlashCards();
         $this->displayPracticeStats();
+
         if (count($this->allowedQuestionsAnswers) === 0) {
             $this->info('No more questions to practice!');
             return;
@@ -118,32 +82,9 @@ class ManageFlashCard extends Command
         $this->info($this->getCorrectPercentage().' % of questions that have a correct answer.');
     }
 
-    private function resetPractices(): void
+    public function setQuit(bool $quit): void
     {
-        if (false === $this->quit) {
-            $this->info('Progress reset successfully!');
-        }
-        Practice::where('user_id', $this->userId)->delete();
-    }
-
-    private function quit(): void
-    {
-        $this->quit = true;
-        $this->resetPractices();
-    }
-    
-    private function showMainMenu(): string
-    {
-        return $this->choice('What would you like to do?', array_keys($this->actions));
-    }
-
-    private function askUntilValid(string $question)
-    {
-        do {
-            $value = $this->ask($question);
-        } while (empty($value));
-
-        return $value;
+        $this->quit = $quit;
     }
 
     private function startPractice(): void
@@ -247,5 +188,32 @@ class ManageFlashCard extends Command
     private function getPercentage(int $value, int $total): int
     {
         return $total > 0 ? (int) (($value / $total) * 100) : 0;
+    }
+
+    private function prepareActions(): void
+    {
+        $sortedActions = $this->sortActionsByPriority();
+        
+        $this->actions = [];
+        $this->menu = [];
+
+        /** @var FlashCardActionInterface $actionInstance */
+        foreach ($sortedActions as $actionInstance) {
+            $actionInstance->setCommand($this);
+
+            $this->menu[$actionInstance->getPriority()] = $actionInstance->getActionName();
+            $this->actions[$actionInstance->getActionName()] = $actionInstance;
+        }
+    }
+    
+    private function sortActionsByPriority(): array
+    {
+        $sortedActions = array_values($this->actions);
+
+        usort($sortedActions, function (FlashCardActionInterface $a, FlashCardActionInterface $b) {
+            return $a->getPriority() <=> $b->getPriority();
+        });
+
+        return $sortedActions;
     }
 }
