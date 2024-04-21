@@ -10,7 +10,7 @@ class ManageFlashCard extends Command
 {
 
     protected $signature = 'flashcard:interactive';
-    protected $description = 'Command description';
+    protected $description = 'This command streamlines flashcard management, practice sessions, and performance tracking. Users can efficiently create, list, and practice flashcards, as well as review their progress through statistics. Immediate feedback during practice ensures a focused learning experience.';
 
     private const USER_ID_LENGTH = 6;
 
