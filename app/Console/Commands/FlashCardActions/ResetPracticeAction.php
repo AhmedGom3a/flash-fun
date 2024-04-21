@@ -6,7 +6,7 @@ use App\Models\Practice;
 
 class ResetPracticeAction extends AbstractAction implements FlashCardActionInterface
 {
-    protected int $priority = 4;
+    protected int $priority = 5;
 
     public static function getActionName(): string
     {

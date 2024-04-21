@@ -5,7 +5,7 @@ namespace App\Repos;
 use App\Models\FlashCard;
 use Illuminate\Database\Eloquent\Collection;
 
-class FlashCardRepositroy
+class FlashCardRepository
 {
     public function getNonPracticedCardsByUserId(string $userId): Collection
     {

@@ -2,11 +2,19 @@
 
 namespace App\Console\Commands\FlashCardActions;
 
-use Illuminate\Console\Command;
+use App\Repos\PracticeRepository;
+use App\Repos\FlashCardRepository;
+use App\Console\Commands\ManageFlashCard;
 
 abstract class AbstractAction
 {
-    protected Command $command;
+    public function __construct(
+        protected FlashCardRepository $flashCardRepository,
+        protected PracticeRepository $practiceRepository,
+    ) {
+    }
+
+    protected ManageFlashCard $command;
 
     protected int $priority = 0;
 
@@ -15,7 +23,7 @@ abstract class AbstractAction
         return $this->priority;
     }
 
-    public function setCommand(Command $command): void
+    public function setCommand(ManageFlashCard $command): void
     {
         $this->command = $command;
     }

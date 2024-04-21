@@ -2,8 +2,6 @@
 
 namespace App\Providers;
 
-use App\Repos\PracticeRepository;
-use App\Repos\FlashCardRepositroy;
 use Illuminate\Support\ServiceProvider;
 use App\Console\Commands\ManageFlashCard;
 
@@ -32,9 +30,7 @@ class FlashCardActionsServiceProvider extends ServiceProvider
 
         $this->app->bind('App\Console\Commands\ManageFlashCard', function ($app) {
             return new ManageFlashCard(
-                $app->make('FlashCard\Action\CardActions'),
-                $app->make(FlashCardRepositroy::class),
-                $app->make(PracticeRepository::class)
+                $app->make('FlashCard\Action\CardActions')
             );
         });
     }

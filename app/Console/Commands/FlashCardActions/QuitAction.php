@@ -4,7 +4,7 @@ namespace App\Console\Commands\FlashCardActions;
 
 class QuitAction extends ResetPracticeAction implements FlashCardActionInterface
 {
-    protected int $priority = 5;
+    protected int $priority = 6;
 
     public static function getActionName(): string
     {

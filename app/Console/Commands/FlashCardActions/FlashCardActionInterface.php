@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands\FlashCardActions;
 
-use Illuminate\Console\Command;
+use App\Console\Commands\ManageFlashCard;
 
 interface FlashCardActionInterface
 {
@@ -12,5 +12,5 @@ interface FlashCardActionInterface
 
     public function handleAction(): void;
 
-    public function setCommand(Command $command): void;
+    public function setCommand(ManageFlashCard $command): void;
 }
