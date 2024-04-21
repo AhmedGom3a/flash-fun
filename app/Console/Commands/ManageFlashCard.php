@@ -19,11 +19,6 @@ class ManageFlashCard extends Command
 
     private array $menu = [];
 
-    public int $correctAnswers = 0;
-    public int $practiced = 0;
-    public array $flashCards = [];
-    public array $allowedQuestionsAnswers = [];
-
     public function __construct(
         private array $actions
     ) {

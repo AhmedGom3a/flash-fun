@@ -15,9 +15,9 @@ class ShowStatsAction extends PracticeAction implements FlashCardActionInterface
     {
         $this->loadFlashCards();
 
-        $allCardsCount = count($this->command->flashCards);
+        $allCardsCount = count($this->flashCards);
         $this->command->info('Total available of questions: '. $allCardsCount);
-        $this->command->info($this->getPercentage($this->command->practiced, $allCardsCount).' % of questions that have an answer.');
+        $this->command->info($this->getPercentage($this->practiced, $allCardsCount).' % of questions that have an answer.');
         $this->command->info($this->getCorrectPercentage().' % of questions that have a correct answer.');
     }
 }

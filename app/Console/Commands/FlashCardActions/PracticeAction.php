@@ -11,6 +11,11 @@ class PracticeAction extends AbstractAction implements FlashCardActionInterface
     private const BACK_TO_MAIN_MENU_INPUT = 0;
     private const FLASH_CARD_DEFAULT_STATUS = 'Not Answered';
 
+    protected int $correctAnswers = 0;
+    protected int $practiced = 0;
+    protected array $flashCards = [];
+    protected array $allowedQuestionsAnswers = [];
+
     public static function getActionName(): string
     {
         return 'Practice';
@@ -21,7 +26,7 @@ class PracticeAction extends AbstractAction implements FlashCardActionInterface
         $this->loadFlashCards();
         $this->displayPracticeStats();
 
-        if (count($this->command->allowedQuestionsAnswers) === self::BACK_TO_MAIN_MENU_INPUT) {
+        if (count($this->allowedQuestionsAnswers) === self::BACK_TO_MAIN_MENU_INPUT) {
             $this->command->info('No more questions to practice!');
             return;
         }
@@ -45,12 +50,12 @@ class PracticeAction extends AbstractAction implements FlashCardActionInterface
                 continue;
             }
 
-            if (false === in_array($chosenQuestionId, array_keys($this->command->allowedQuestionsAnswers))) {
+            if (false === in_array($chosenQuestionId, array_keys($this->allowedQuestionsAnswers))) {
                 $this->command->info('Already answered this question!');
                 continue;
             }
 
-            $chosenQuestion = array_filter($this->command->flashCards, function($card) use ($chosenQuestionId) {
+            $chosenQuestion = array_filter($this->flashCards, function($card) use ($chosenQuestionId) {
                 return $card['number'] === (int) $chosenQuestionId;
             });
 
@@ -85,43 +90,43 @@ class PracticeAction extends AbstractAction implements FlashCardActionInterface
 
     private function checkValidAnswer(int $questionId, string $answer): bool
     {
-        return isset($this->command->allowedQuestionsAnswers[$questionId])
-        && strtolower($this->command->allowedQuestionsAnswers[$questionId]) == strtolower($answer);
+        return isset($this->allowedQuestionsAnswers[$questionId])
+        && strtolower($this->allowedQuestionsAnswers[$questionId]) == strtolower($answer);
     }
 
     private function displayPracticeStats(): void 
     {
-        usort($this->command->flashCards, function (array $a, array $b) {
+        usort($this->flashCards, function (array $a, array $b) {
             return $a['number'] <=> $b['number'];
         });
 
-        $this->command->table(['Number','Question', 'Status'], $this->command->flashCards);
+        $this->command->table(['Number','Question', 'Status'], $this->flashCards);
         $this->command->info('---------------------');
         $this->command->info(sprintf(
             'Correct Answered questions are %d out of %d (%d%%)',
-            $this->command->correctAnswers,
-            count($this->command->flashCards),
+            $this->correctAnswers,
+            count($this->flashCards),
             $this->getCorrectPercentage()
         ));
     }
 
     protected function loadFlashCards(): void
     {
-        $this->command->allowedQuestionsAnswers = [];
-        $this->command->flashCards = [];
+        $this->allowedQuestionsAnswers = [];
+        $this->flashCards = [];
         $nonPracticed = $this->flashCardRepository->getNonPracticedCardsByUserId($this->command->getUserId());
         $this->prepareCardsCollection($nonPracticed);
         $this->prepareCardsCollection($this->practiceRepository->getUserPractices($this->command->getUserId()));
         
-        $this->command->practiced = count($this->command->flashCards) - count($nonPracticed);
-        $this->command->correctAnswers = count($this->command->flashCards) - count($this->command->allowedQuestionsAnswers);
+        $this->practiced = count($this->flashCards) - count($nonPracticed);
+        $this->correctAnswers = count($this->flashCards) - count($this->allowedQuestionsAnswers);
     }
 
     private function prepareCardsCollection(Collection $cards): void
     { 
         foreach ($cards as $card) {
             $flashCardId = $card->flash_card_id ?? $card->id;
-            $this->command->flashCards[$flashCardId] = [
+            $this->flashCards[$flashCardId] = [
                 'number' => $flashCardId,
                 'question' => $card->question,
                 'status' => $card->status ?? self::FLASH_CARD_DEFAULT_STATUS
@@ -129,14 +134,14 @@ class PracticeAction extends AbstractAction implements FlashCardActionInterface
 
             // User can only practice not answered or Incorrect cards
             if($card->status === null || $card->status === 'Incorrect') {
-                $this->command->allowedQuestionsAnswers[$flashCardId] = $card->answer;
+                $this->allowedQuestionsAnswers[$flashCardId] = $card->answer;
             }
         }
     }
 
     protected function getCorrectPercentage(): int
     {
-        return $this->getPercentage($this->command->correctAnswers, count($this->command->flashCards));
+        return $this->getPercentage($this->correctAnswers, count($this->flashCards));
     }
 
     protected function getPercentage(int $value, int $total): int
