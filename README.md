@@ -1,8 +1,8 @@
-# Flashcard Manager
+# Flash Fun
 
 ## Overview
 
-The Flashcard Manager is a Laravel command-line tool designed to streamline flashcard management, practice sessions, and performance tracking.
+Flash Fun is a console tool designed to streamline flashcard management, practice sessions, and performance tracking.
 
 ## Features
 
@@ -13,12 +13,11 @@ The Flashcard Manager is a Laravel command-line tool designed to streamline flas
 - **Immediate Feedback**: Receive instant feedback on correctness during practice.
 - **Performance Tracking**: Track performance and progress through statistics.
 - **Reset Option**: Reset progress to start anew.
-- **Quit Option**: Exit the command when done.
 
 ## Usage
 
 1. Clone the repository to your local machine.
-2. Run the Laravel command `php artisan your-command` to launch the Flashcard Manager.
+2. Run the Laravel command `php artisan flashcard:interactive` to launch the Flashcard Manager.
 3. Follow the on-screen instructions to navigate the menu, create flashcards, practice, view stats, reset progress, or quit.
 
 ## Requirements
