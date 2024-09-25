@@ -17,7 +17,7 @@ Flash Fun is a console tool designed to streamline flashcard management, practic
 ## Usage
 
 1. Clone the repository to your local machine.
-2. Follow [installation](#Installtion) steps.
+2. Follow [installation](#installation) steps.
 3. Run the Laravel command `php artisan flashcard:interactive` to launch the Flashcard Manager.
 4. Follow the on-screen instructions to navigate the menu, create flashcards, practice, view stats, reset progress, or quit.
 
